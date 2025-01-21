@@ -1,19 +1,65 @@
-import fastify from "fastify";
-import fastifyCors from "@fastify/cors";
+import { env } from '@/env';
+import { uploadImageRoute } from '@/infra/http/routes/upload-image';
+import fastifyCors from '@fastify/cors';
+import fastifyMultipart from '@fastify/multipart';
+import fastifySwagger from '@fastify/swagger';
+import fastifySwaggerUi from '@fastify/swagger-ui';
+import fastify from 'fastify';
+import {
+  hasZodFastifySchemaValidationErrors,
+  serializerCompiler,
+  validatorCompiler,
+} from 'fastify-type-provider-zod';
+import { exportUploadsRoute } from './routes/export-uploads';
+import { getUploadRoute } from './routes/get-uploads';
+import { transformSwaggerSchema } from './transform-swagger-schema';
 
 const server = fastify();
 
 server.register(fastifyCors, {
-  origin: "*",
+  origin: '*',
 });
 
-const port = 3333;
+server.setValidatorCompiler(validatorCompiler);
+server.setSerializerCompiler(serializerCompiler);
+
+server.setErrorHandler((error, request, reply) => {
+  if (hasZodFastifySchemaValidationErrors(error)) {
+    return reply.status(400).send({
+      message: 'Validation Error',
+      issues: error.validation,
+    });
+  }
+  // Enviar o erro para alguma ferramenta de observabilidade (Datadog, Sentry, Graafana, Otel)
+  console.log(error);
+
+  return reply.status(500).send({ message: 'Internal server error' });
+});
+
+server.register(fastifyMultipart);
+server.register(fastifySwagger, {
+  openapi: {
+    info: {
+      title: 'Upload API',
+
+      version: '1.0.0',
+    },
+  },
+  transform: transformSwaggerSchema,
+});
+server.register(fastifySwaggerUi, {
+  routePrefix: '/docs',
+});
+
+server.register(uploadImageRoute);
+server.register(getUploadRoute);
+server.register(exportUploadsRoute);
 
 server
   .listen({
-    port,
-    host: "0.0.0.0",
+    port: env.PORT,
+    host: '0.0.0.0',
   })
   .then(() => {
-    console.log(`HTTP Server is running on port ${port} 🚀🔥`);
+    console.log(`HTTP Server is running on port ${env.PORT} 🚀🔥`);
   });
