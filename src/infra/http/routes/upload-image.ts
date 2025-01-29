@@ -13,7 +13,11 @@ export const uploadImageRoute: FastifyPluginAsyncZod = async (server) => {
         tags: ['uploads'],
 
         response: {
-          201: z.null().describe('File uploaded successfully'),
+          201: z
+            .object({
+              url: z.string().describe('URL of the uploaded image'),
+            })
+            .describe('File uploaded successfully'),
           400: z.object({
             message: z.string().describe('File is required'),
           }),
@@ -46,9 +50,9 @@ export const uploadImageRoute: FastifyPluginAsyncZod = async (server) => {
       }
 
       if (isRight(result)) {
-        console.log(unwrapEither(result));
+        const { url } = unwrapEither(result);
 
-        return reply.status(201).send();
+        return reply.status(201).send({ url });
       }
 
       const error = unwrapEither(result);
